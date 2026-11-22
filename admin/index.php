@@ -1,0 +1,21 @@
+<?php require __DIR__.'/../inc/layout.php'; require_admin();
+[$a,$b]=period();$cat=(int)($_GET['cat']??0);$pdo=db();
+$rev=function($x,$y,$c) use($pdo){$s=$pdo->prepare("SELECT COALESCE(SUM(p.amount),0) FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.paid_at BETWEEN ? AND ? AND (?=0 OR o.category_id=?)");$s->execute([$x,$y,$c,$c]);return (float)$s->fetchColumn();};
+$r=$rev($a,$b,$cat);$today=$rev(date('Y-m-d 00:00:00'),date('Y-m-d 23:59:59'),0);$month=$rev(date('Y-m-01 00:00:00'),date('Y-m-d 23:59:59'),0);
+$s=$pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE spent_at BETWEEN ? AND ?");$s->execute([$a,$b]);$exp=(float)$s->fetchColumn();
+$s=$pdo->prepare("SELECT status,COUNT(*) n FROM orders WHERE created_at BETWEEN ? AND ? AND (?=0 OR category_id=?) GROUP BY status");$s->execute([$a,$b,$cat,$cat]);$sc=$s->fetchAll(PDO::FETCH_KEY_PAIR);
+$s=$pdo->prepare("SELECT c.name,COALESCE(SUM(p.amount),0) v,COUNT(DISTINCT o.id) n FROM categories c LEFT JOIN orders o ON o.category_id=c.id LEFT JOIN payments p ON p.order_id=o.id AND p.paid_at BETWEEN ? AND ? GROUP BY c.id ORDER BY c.sort");$s->execute([$a,$b]);$bycat=$s->fetchAll();
+$mo=$pdo->query("SELECT DATE_FORMAT(paid_at,'%Y-%m') m,SUM(amount) v FROM payments WHERE paid_at>=DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 11 MONTH),'%Y-%m-01') GROUP BY m ORDER BY m")->fetchAll(PDO::FETCH_KEY_PAIR);$max=max(1,...array_map('floatval',$mo?:[0]));
+$s=$pdo->prepare("SELECT p.*,o.code,o.service_name FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.paid_at BETWEEN ? AND ? AND (?=0 OR o.category_id=?) ORDER BY p.paid_at DESC LIMIT 20");$s->execute([$a,$b,$cat,$cat]);$tx=$s->fetchAll();
+$cats=$pdo->query("SELECT id,name FROM categories ORDER BY sort")->fetchAll();$P=$_GET['p']??'30';
+head('Painel',true); ?>
+<h1>Dashboard</h1><form class="row card"><label>Período<select name="p"><?php foreach(['hoje'=>'Hoje','7'=>'Últimos 7 dias','30'=>'Últimos 30 dias','mes'=>'Este mês','anterior'=>'Mês anterior','custom'=>'Personalizado'] as $k=>$v): ?><option value="<?=$k?>" <?=$P==(string)$k?'selected':''?>><?=$v?></option><?php endforeach; ?></select></label>
+<label>De<input type="date" name="de" value="<?=e($_GET['de']??'')?>"></label><label>Até<input type="date" name="ate" value="<?=e($_GET['ate']??'')?>"></label>
+<label>Categoria<select name="cat"><option value="0">Todas</option><?php foreach($cats as $c): ?><option value="<?=$c['id']?>" <?=$cat==$c['id']?'selected':''?>><?=e($c['name'])?></option><?php endforeach; ?></select></label><button class="btn">Filtrar</button></form>
+<div class="kpis" style="margin-top:16px">
+<?php foreach(['Faturamento (período)'=>money($r),'Faturamento hoje'=>money($today),'Faturamento do mês'=>money($month),'Despesas (período)'=>money($exp),'Lucro líquido'=>money($r-$exp),'Total de pedidos'=>array_sum($sc),'Pendentes'=>($sc['aguardando_pagamento']??0)+($sc['aguardando_informacoes']??0),'Concluídos'=>$sc['concluido']??0,'Cancelados'=>$sc['cancelado']??0] as $k=>$v): ?><div class="card kpi"><span class="muted"><?=e($k)?></span><b><?=e($v)?></b></div><?php endforeach; ?></div>
+<p class="muted">O lucro líquido considera todas as despesas do período; o filtro de categoria afeta faturamento e pedidos.</p>
+<h2>Faturamento mensal (12 meses)</h2><?php if(!$mo): ?><p class="muted">Sem pagamentos registrados ainda.</p><?php else: ?><div class="bars card"><?php foreach($mo as $m=>$v): ?><div><i style="height:<?=round($v/$max*140)?>px" title="<?=e(money($v))?>"></i><?=e(substr($m,5))?>/<?=e(substr($m,2,2))?></div><?php endforeach; ?></div><?php endif; ?>
+<h2>Vendas por categoria</h2><div class="tw"><table><tr><th>Categoria</th><th>Pedidos</th><th>Recebido</th></tr><?php foreach($bycat as $c): ?><tr><td><?=e($c['name'])?></td><td><?=(int)$c['n']?></td><td><?=e(money($c['v']))?></td></tr><?php endforeach; ?></table></div>
+<h2>Histórico de transações</h2><div class="tw"><table><tr><th>Data</th><th>Pedido</th><th>Serviço</th><th>Forma</th><th>Valor</th></tr><?php foreach($tx as $t): ?><tr><td><?=e(date('d/m/Y',strtotime($t['paid_at'])))?></td><td><?=e($t['code'])?></td><td><?=e($t['service_name'])?></td><td><?=e($t['method'])?></td><td><?=e(money($t['amount']))?></td></tr><?php endforeach; ?></table></div>
+<?php foot(true); ?>

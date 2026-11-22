@@ -1,0 +1,15 @@
+SET NAMES utf8mb4;
+CREATE TABLE users(id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(80) NOT NULL,email VARCHAR(120) NOT NULL UNIQUE,pass_hash VARCHAR(255) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
+CREATE TABLE categories(id INT AUTO_INCREMENT PRIMARY KEY,slug VARCHAR(40) NOT NULL UNIQUE,name VARCHAR(80) NOT NULL,description VARCHAR(255) NOT NULL DEFAULT '',sort INT NOT NULL DEFAULT 0) ENGINE=InnoDB;
+CREATE TABLE services(id INT AUTO_INCREMENT PRIMARY KEY,category_id INT NOT NULL,name VARCHAR(120) NOT NULL,description TEXT NOT NULL,features TEXT NULL,info TEXT NULL,price DECIMAL(10,2) NULL,deadline VARCHAR(60) NULL,image VARCHAR(80) NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(category_id) REFERENCES categories(id)) ENGINE=InnoDB;
+CREATE TABLE customers(id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(120) NOT NULL,email VARCHAR(120) NOT NULL,phone VARCHAR(30) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE(email)) ENGINE=InnoDB;
+CREATE TABLE orders(id INT AUTO_INCREMENT PRIMARY KEY,code VARCHAR(16) NOT NULL UNIQUE,customer_id INT NOT NULL,service_id INT NULL,category_id INT NOT NULL,service_name VARCHAR(120) NOT NULL,price DECIMAL(10,2) NULL,status ENUM('aguardando_pagamento','pagamento_confirmado','em_andamento','aguardando_informacoes','concluido','cancelado') NOT NULL DEFAULT 'aguardando_pagamento',notes TEXT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(customer_id) REFERENCES customers(id),FOREIGN KEY(service_id) REFERENCES services(id) ON DELETE SET NULL,FOREIGN KEY(category_id) REFERENCES categories(id)) ENGINE=InnoDB;
+CREATE TABLE payments(id INT AUTO_INCREMENT PRIMARY KEY,order_id INT NOT NULL,amount DECIMAL(10,2) NOT NULL,method VARCHAR(30) NOT NULL,reference VARCHAR(80) NULL,paid_at DATETIME NOT NULL,user_id INT NULL,FOREIGN KEY(order_id) REFERENCES orders(id)) ENGINE=InnoDB;
+CREATE TABLE expenses(id INT AUTO_INCREMENT PRIMARY KEY,description VARCHAR(160) NOT NULL,amount DECIMAL(10,2) NOT NULL,spent_at DATE NOT NULL,user_id INT NULL) ENGINE=InnoDB;
+CREATE TABLE settings(k VARCHAR(40) PRIMARY KEY,v TEXT NOT NULL) ENGINE=InnoDB;
+CREATE TABLE audit_log(id INT AUTO_INCREMENT PRIMARY KEY,user_id INT NULL,action VARCHAR(200) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
+INSERT INTO categories(slug,name,description,sort) VALUES
+('instagram','Instagram','Configuração, consultoria e gestão de perfis profissionais.',1),
+('business-manager','Business Manager','Configuração, permissões e organização de ativos empresariais.',2),
+('sites','Criação de Sites','Landing pages, sites institucionais, lojas virtuais e sistemas.',3);
+INSERT INTO settings(k,v) VALUES('whatsapp',''),('email',''),('about','Edite este texto em Admin → Configurações.'),('payment_info','Após enviar o pedido, nossa equipe entra em contato com as instruções de pagamento.'),('p1_name','Sócio 1'),('p1_pct','50'),('p2_name','Sócio 2'),('p2_pct','50');
